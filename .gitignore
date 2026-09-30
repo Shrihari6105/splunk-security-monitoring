@@ -1,0 +1,19 @@
+# Splunk runtime / local artefacts
+*.log
+*.pid
+var/
+local.meta
+*.spl.bak
+# Raw data - commit only sanitised samples
+*.pcap
+*.evtx
+!sample-data/*.evtx
+# Secrets
+passwd
+*.pem
+*.key
+.env
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
