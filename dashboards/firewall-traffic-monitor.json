@@ -1,6 +1,6 @@
 {
   "title": "Firewall Traffic Monitor",
-  "description": "firewall_traffic_logs_large.csv baseline + labelled attack simulation (index fw_lab).",
+  "description": "Firewall logs (index fw_lab): baseline traffic plus a labelled attack simulation.",
   "dataSources": {
     "ds_kpi_conn": {
       "type": "ds.search",
@@ -55,7 +55,7 @@
     "ds_detections": {
       "type": "ds.search",
       "options": {
-        "query": "| makeresults | where 1=0 | append [search index=fw_lab sourcetype=fw:traffic | bin _time span=5m | stats dc(port) AS evidence BY _time src_ip dest_ip | where evidence>=15 | eval detection=\"D009 Port scan\", detail=evidence.\" distinct ports on \".dest_ip] | append [search index=fw_lab sourcetype=fw:traffic port=3389 | bin _time span=5m | stats count AS evidence count(eval(action=\"allowed\")) AS a BY _time src_ip | where evidence>=15 | eval detection=\"D010 RDP brute force\", detail=evidence.\" attempts, \".a.\" allowed\"] | append [search index=fw_lab sourcetype=fw:traffic action=allowed | where NOT (cidrmatch(\"10.0.0.0/8\",dest_ip) OR cidrmatch(\"172.16.0.0/12\",dest_ip) OR cidrmatch(\"192.168.0.0/16\",dest_ip)) | bin _time span=10m | stats sum(bytes) AS b BY _time src_ip dest_ip | where b>=50000000 | eval detection=\"D011 Large outbound transfer\", detail=round(b/1024/1024,1).\" MB to \".dest_ip] | eval Time=strftime(_time,\"%F %T\") | table Time detection src_ip detail | rename detection AS Detection, src_ip AS \"Source IP\", detail AS Evidence",
+        "query": "| makeresults | where 1=0 | append [search index=fw_lab sourcetype=fw:traffic | bin _time span=5m | stats dc(port) AS evidence BY _time src_ip dest_ip | where evidence>=15 | eval detection=\"Port scan\", detail=evidence.\" distinct ports on \".dest_ip] | append [search index=fw_lab sourcetype=fw:traffic port=3389 | bin _time span=5m | stats count AS evidence count(eval(action=\"allowed\")) AS a BY _time src_ip | where evidence>=15 | eval detection=\"RDP brute force\", detail=evidence.\" attempts, \".a.\" allowed\"] | append [search index=fw_lab sourcetype=fw:traffic action=allowed | where NOT (cidrmatch(\"10.0.0.0/8\",dest_ip) OR cidrmatch(\"172.16.0.0/12\",dest_ip) OR cidrmatch(\"192.168.0.0/16\",dest_ip)) | bin _time span=10m | stats sum(bytes) AS b BY _time src_ip dest_ip | where b>=50000000 | eval detection=\"Large outbound transfer\", detail=round(b/1024/1024,1).\" MB to \".dest_ip] | eval Time=strftime(_time,\"%F %T\") | table Time detection src_ip detail | rename detection AS Detection, src_ip AS \"Source IP\", detail AS Evidence",
         "queryParameters": {
           "earliest": "$global_time.earliest$",
           "latest": "$global_time.latest$"
@@ -175,7 +175,7 @@
       "dataSources": {
         "primary": "ds_dq"
       },
-      "title": "Data quality: impossible field combinations (DQ001)",
+      "title": "Data quality: impossible field combinations",
       "options": {
         "count": 10
       }

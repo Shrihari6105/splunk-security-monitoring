@@ -1,6 +1,7 @@
-`comment("H001 - Same source attacking SSH and web | Hunt, not an alert
-IPs with >=50 failed SSH logins AND >=20 web error responses.
-Run 2026-09-30 on project_1: 152 IPs matched; top 87.194.216.51 (UK) - 948 SSH failures, 142 web errors.")`
+``` Same source attacking SSH and web
+    Hunt, not an alert
+    IPs with >=50 failed SSH logins AND >=20 web error responses.
+    Run 2026-09-30 on project_1: 152 IPs matched; top 87.194.216.51 (UK) - 948 SSH failures, 142 web errors. ```
 (index=project_1 sourcetype=secure-2 "Failed password") OR (index=project_1 sourcetype=access_combined_wcookie status>=400)
 | rex "sshd\[\d+\]: Failed password for (invalid user )?\S+ from (?<ssh_ip>[\d\.]+) port"
 | eval ip=coalesce(ssh_ip, clientip), vector=if(sourcetype="secure-2", "ssh", "web")

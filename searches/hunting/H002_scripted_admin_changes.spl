@@ -1,8 +1,0 @@
-`comment("H002 - Scripted clients modifying admin/user endpoints (posture hunt)
-Non-browser clients (curl, Postman, python) successfully running DELETE/PUT against /admin or /api/user.
-Run on the original complex_log.csv baseline: 19 requests from 15 internal IPs - no attack, but these endpoints accept
-destructive requests from scripts, which is an access-control gap worth reporting.")`
-index=web_lab sourcetype=web:access (user_agent="curl*" OR user_agent="Postman*" OR user_agent="python*")
-    (method=DELETE OR method=PUT) resource IN ("/admin", "/api/user") status_code>=200 status_code<300
-| stats count AS requests values(method) AS methods values(resource) AS resources values(user_agent) AS ua BY client_ip
-| sort - requests

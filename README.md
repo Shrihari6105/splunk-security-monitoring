@@ -1,88 +1,152 @@
 # Splunk Security Monitoring
 
-Security monitoring and threat detection with Splunk — SPL detection searches, SOC dashboards, alerts, and log-source configuration.
+Threat detection and SOC dashboards built in Splunk Cloud. The project covers SSH, web and firewall logs, with detections mapped to MITRE ATT&CK and tested against a labelled attack simulation.
 
-## Goals
+## Highlights
 
-- Ingest and normalise security-relevant logs (Windows Event Logs, Linux auth/syslog, firewall, web server)
-- Write SPL detections mapped to MITRE ATT&CK
-- Build SOC dashboards for triage and investigation
-- Configure alerts with sensible thresholds and throttling
-
-## Repository layout
-
-| Path | Contents |
-|---|---|
-| `searches/detections/` | Detection searches (`.spl`), one per use case |
-| `searches/hunting/` | Ad-hoc threat-hunting queries |
-| `dashboards/` | Dashboard Studio JSON / Simple XML exports |
-| `alerts/` | Saved-search / alert definitions (`savedsearches.conf` snippets) |
-| `apps/local/` | Custom Splunk app configs |
-| `configs/inputs/` | `inputs.conf` examples for forwarders |
-| `configs/props-transforms/` | Field extractions (`props.conf`, `transforms.conf`) |
-| `sample-data/` | Lab datasets and simulated attack CSVs |
-| `simulation/` | Deterministic attack-simulation generators (Python + SPL) |
-| `docs/` | Setup notes, architecture, write-ups |
-| `screenshots/` | Dashboard and result screenshots |
-
-## Detection index
-
-| ID | Detection | Data source | MITRE ATT&CK | Status |
-|---|---|---|---|---|
-| D001 | [Brute-force login attempts](searches/detections/D001_bruteforce_login.spl) | Windows Security (4625) | T1110 | Written, no Windows data yet |
-| D002 | [SSH brute force](searches/detections/D002_ssh_bruteforce.spl) | Linux secure log | T1110.001 | Validated |
-| D003 | [SSH success after repeated failures](searches/detections/D003_ssh_success_after_failures.spl) | Linux secure log | T1110 / T1078 | Validated (0 hits) |
-| D004 | [Web scanning / probing](searches/detections/D004_web_error_scanning.spl) | Apache access log | T1595 | Validated |
-
-| D005 | [Web login brute force](searches/detections/D005_web_login_bruteforce.spl) | Web access (lab) | T1110.001 | Validated: 1 TP, 0 FP |
-| D006 | [HTTP 404 spike](searches/detections/D006_web_404_spike.spl) | Web access (lab) | T1595.003 | Validated: 1 TP, 0 FP |
-| D007 | [Content discovery](searches/detections/D007_web_content_discovery.spl) | Web access (lab) | T1595.003 / T1083 | Validated: 1 TP, 0 FP |
-| D008 | [Admin denied then modified](searches/detections/D008_web_admin_denied_then_modified.spl) | Web access (lab) | T1078 / T1485 | Validated: 1 TP, 0 FP |
-| D009 | [Port scan](searches/detections/D009_fw_port_scan.spl) | Firewall (lab) | T1046 | Validated: 1 TP, 0 FP |
-| D010 | [RDP brute force](searches/detections/D010_fw_rdp_bruteforce.spl) | Firewall (lab) | T1110 / T1021.001 | Validated: 1 TP, 0 FP |
-| D011 | [Large outbound transfer](searches/detections/D011_fw_large_outbound_transfer.spl) | Firewall (lab) | T1041 / T1048 | Validated: 1 TP, 0 FP |
-| DQ001 | [Firewall field integrity](searches/detections/DQ001_fw_field_integrity.spl) | Firewall (lab) | Data quality | 56 impossible records |
-
-Hunting: [H001 — same source attacking SSH and web](searches/hunting/H001_ssh_and_web_same_source.spl) · [H002 — scripted clients changing admin endpoints](searches/hunting/H002_scripted_admin_changes.spl)
-
-Alerts and scheduled report: [alerts/savedsearches.conf](alerts/savedsearches.conf) (throttled, severity-rated)
+- **3 Dashboard Studio dashboards** for SSH, web application and firewall monitoring
+- **11 detection searches** mapped to MITRE ATT&CK, plus 2 threat-hunting searches and a data-quality check
+- **Every threshold based on measured normal traffic**, not guesswork
+- **Tested with a reproducible attack simulation**: all 6 simulated attacks detected with 0 false positives on 1,200 normal events
+- **Scheduled alerts** with per-attacker throttling and severity ratings
 
 ## Dashboards
 
-| Dashboard | Panels | Export |
-|---|---|---|
-| Web App Threat Monitor v2 | KPIs, status-class trend, web detections fired, top 404 clients, browser vs scripted, /admin access, posture table | [web-app-threat-monitor-v2.json](dashboards/web-app-threat-monitor-v2.json) |
-| Firewall Traffic Monitor | KPIs, allowed/blocked trend, firewall detections fired, top ports, RDP sources, data-quality table | [firewall-traffic-monitor.json](dashboards/firewall-traffic-monitor.json) |
-| SSH & Web Security Overview | 4 KPIs, auth trend, failures by host, brute-force sources, attacker countries, targeted usernames, web errors, web scanners, compromise check | [ssh-web-security-overview.json](dashboards/ssh-web-security-overview.json) |
+### Web Application Threat Monitor
 
-Findings: [SSH & web (tutorial data)](docs/findings.md) · [Web & firewall lab: detection matrix](docs/lab-detection-results.md) · [Review of my earlier IBM assessment](docs/ibm-assessment-review.md)
+Traffic by status class, detections that fired, top 404 clients, browser vs scripted clients, and `/admin` access.
+
+![Web Application Threat Monitor](screenshots/web-app-threat-monitor.png)
+
+### Firewall Traffic Monitor
+
+Allowed vs blocked traffic, detections that fired, top destination ports, RDP sources and a data-quality check.
+
+![Firewall Traffic Monitor](screenshots/firewall-traffic-monitor.png)
+
+### SSH & Web Security Overview
+
+SSH brute-force activity across four servers: failed vs successful logins, attacking IPs and countries, targeted usernames, and web scanners.
+
+![SSH & Web Security Overview](screenshots/ssh-web-security-overview.png)
+
+The dashboard source files are in [`dashboards/`](dashboards). To import one, open Splunk and go to **Dashboards → Create New Dashboard → Dashboard Studio**, then paste the JSON into the source editor.
+
+## Detections
+
+### Linux (SSH)
+
+| Detection | MITRE ATT&CK | Result |
+|---|---|---|
+| [SSH brute force](searches/detections/linux/ssh_brute_force.spl) | T1110.001 | Top source made 948 failed attempts |
+| [SSH login after repeated failures](searches/detections/linux/ssh_login_after_failures.spl) | T1110, T1078 | No hits: no attacker got in |
+
+### Web
+
+| Detection | MITRE ATT&CK | Result |
+|---|---|---|
+| [Error-based scanning](searches/detections/web/error_based_scanning.spl) | T1595 | Top scanner: 142 errors across 12 URLs |
+| [Login brute force](searches/detections/web/login_brute_force.spl) | T1110.001 | Caught the simulated attack, 0 false positives |
+| [404 spike](searches/detections/web/404_spike.spl) | T1595.003 | Caught the simulated attack, 0 false positives |
+| [Content discovery](searches/detections/web/content_discovery.spl) | T1595.003, T1083 | Caught the simulated attack, 0 false positives |
+| [Admin denied, then modified](searches/detections/web/admin_denied_then_modified.spl) | T1078, T1485 | Caught the simulated attack, 0 false positives |
+
+### Network (firewall)
+
+| Detection | MITRE ATT&CK | Result |
+|---|---|---|
+| [Port scan](searches/detections/network/port_scan.spl) | T1046 | Caught the simulated attack, 0 false positives |
+| [RDP brute force](searches/detections/network/rdp_brute_force.spl) | T1110, T1021.001 | Caught the simulated attack, 0 false positives |
+| [Large outbound transfer](searches/detections/network/large_outbound_transfer.spl) | T1041, T1048 | Caught the simulated attack, 0 false positives |
+
+### Windows
+
+| Detection | MITRE ATT&CK | Result |
+|---|---|---|
+| [Failed logon burst](searches/detections/windows/failed_logon_burst.spl) | T1110 | Written; no Windows data loaded yet |
+
+### Hunting and data quality
+
+| Search | Purpose |
+|---|---|
+| [SSH and web attacks from the same source](searches/hunting/ssh_and_web_same_source.spl) | Finds IPs attacking both services (152 found) |
+| [Scripted clients changing admin endpoints](searches/hunting/scripted_admin_changes.spl) | Finds curl/Postman requests that change data on `/admin` or `/api/user` |
+| [Firewall field integrity](searches/data-quality/firewall_field_integrity.spl) | Flags impossible records, such as ICMP traffic with a port number |
+
+Scheduled versions of the web and network detections are in [`alerts/savedsearches.conf`](alerts/savedsearches.conf).
+
+## Key findings
+
+**SSH and web** ([full write-up](docs/findings-ssh-web.md))
+
+- 33,069 failed SSH logins from 182 IPs; 73% of them tried usernames that don't exist.
+- No attacking IP ever logged in successfully.
+- 152 IPs attacked both SSH and the web servers.
+
+**Web and firewall lab** ([full write-up](docs/findings-web-firewall-lab.md))
+
+- All 6 simulated attacks were detected, with no false positives.
+- In the original data, scripts successfully ran 19 DELETE/PUT requests against admin endpoints.
+- RDP was allowed from 9 internal sources.
+- The firewall log contains 56 records that can't be real (ICMP with a port number).
 
 ## Data
 
-Splunk Cloud trial, index `project_1` — the Splunk tutorial dataset (Buttercup Games), 21–28 Sep 2026:
+| Index | Sourcetype | Events | Content |
+|---|---|---|---|
+| `project_1` | `secure-2` | ~40,000 | Linux SSH logs from 4 servers |
+| `project_1` | `access_combined_wcookie` | ~39,500 | Apache web access logs |
+| `web_lab` | `web:access` | 1,000 + 261 simulated | [`sample-data/complex_log.csv`](sample-data/complex_log.csv) |
+| `fw_lab` | `fw:traffic` | 200 + 112 simulated | [`sample-data/firewall_traffic_logs_large.csv`](sample-data/firewall_traffic_logs_large.csv) |
 
-| Sourcetype | Events | Content |
-|---|---|---|
-| `secure-2` | ~40k | Linux SSH auth logs from `mailsv1`, `www1-3` |
-| `access_combined_wcookie` | ~39.5k | Apache web access logs |
-| `vendor_sales` | ~30k | Retail sales (not security-relevant) |
+`project_1` holds Splunk's tutorial dataset (a fictional online game store). The two lab datasets are synthetic and contain no real attacks, so I added a labelled attack simulation to test the detections against.
 
-Lab indexes (June 2025 synthetic data plus a labelled [attack simulation](simulation/README.md)):
+## Attack simulation
 
-| Index / sourcetype | Events | Source |
-|---|---|---|
-| `web_lab` / `web:access` | 1,000 + 261 simulated | `sample-data/complex_log.csv` |
-| `fw_lab` / `fw:traffic` | 200 + 112 simulated | `sample-data/firewall_traffic_logs_large.csv` |
+Six attack scenarios are generated deterministically, so every run produces the same events:
 
-## Environment
+| Scenario | Technique |
+|---|---|
+| Web login brute force | 150 failed logins in 10 minutes, then a success |
+| Content discovery scan | Nikto probing 20 missing paths |
+| Admin abuse | Denied on `/admin`, then successful deletes with curl |
+| Port scan | 60 ports on one host in 60 seconds |
+| RDP brute force | 40 attempts in 4 minutes, 10 allowed |
+| Data exfiltration | 163.5 MB to one external IP in 3 minutes |
 
-- Splunk Enterprise (free/trial) or Splunk Cloud trial
-- Universal Forwarder on monitored hosts
+Attacker IPs come from reserved documentation ranges (RFC 5737). Every simulated event is tagged with a `scenario` field so it can be filtered out. The Python and SPL generators produce identical output. Details: [`simulation/README.md`](simulation/README.md)
 
-## Setup
+## Repository layout
 
-See [docs/setup.md](docs/setup.md).
+```
+.
+├── alerts/            Scheduled alert and report definitions
+├── configs/           Forwarder inputs and field extractions
+├── dashboards/        Dashboard Studio JSON exports
+├── docs/              Setup guide and findings
+├── sample-data/       Lab datasets and simulated attack events
+├── screenshots/       Dashboard screenshots
+├── searches/
+│   ├── detections/    linux/, web/, network/, windows/
+│   ├── hunting/       Threat-hunting searches
+│   └── data-quality/  Log integrity checks
+└── simulation/        Attack simulation (Python and SPL)
+```
+
+## Running it yourself
+
+1. Create a Splunk Cloud trial or install Splunk Enterprise.
+2. Create the indexes `web_lab` and `fw_lab`.
+3. Load the CSVs from `sample-data/` and the simulated events, following [`simulation/README.md`](simulation/README.md).
+4. Import the dashboards from `dashboards/`.
+5. Run any search in `searches/` from Search & Reporting, with the time range set to **All time**.
+
+Setup notes for forwarders and the tutorial data are in [`docs/setup.md`](docs/setup.md).
+
+## Tools
+
+Splunk Cloud · SPL · Dashboard Studio · Python · MITRE ATT&CK
 
 ## Author
 
-Shrihari — [@Shrihari6105](https://github.com/Shrihari6105)
+Shrihari V · [@Shrihari6105](https://github.com/Shrihari6105)

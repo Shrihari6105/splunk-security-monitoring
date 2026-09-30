@@ -1,4 +1,6 @@
-`comment("D001 - Brute-force login attempts | MITRE ATT&CK T1110 | Source: Windows Security 4625")`
+``` Brute-force login attempts
+    MITRE ATT&CK T1110
+    Source: Windows Security 4625 ```
 index=wineventlog sourcetype="WinEventLog:Security" EventCode=4625
 | bin _time span=5m
 | stats count AS failed_attempts dc(TargetUserName) AS distinct_users values(TargetUserName) AS users BY _time, src_ip

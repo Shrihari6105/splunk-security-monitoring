@@ -1,3 +1,3 @@
-# screenshots
+# Screenshots
 
-Dashboard and search-result screenshots used in the docs.
+Full-page captures of the three Splunk dashboards, used in the main README.

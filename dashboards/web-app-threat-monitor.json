@@ -1,6 +1,6 @@
 {
-  "title": "Web App Threat Monitor v2",
-  "description": "Improved version of the IBM assessment dashboard: complex_log.csv baseline + labelled attack simulation (index web_lab).",
+  "title": "Web Application Threat Monitor",
+  "description": "Web access logs (index web_lab): baseline traffic plus a labelled attack simulation.",
   "dataSources": {
     "ds_kpi_req": {
       "type": "ds.search",
@@ -55,7 +55,7 @@
     "ds_detections": {
       "type": "ds.search",
       "options": {
-        "query": "| makeresults | eval detection=\"none\" | where 1=0 | append [search index=web_lab sourcetype=web:access resource=\"/login\" status_code=401 | bin _time span=10m | stats count AS evidence BY _time client_ip | where evidence>=20 | eval detection=\"D005 Login brute force\", detail=evidence.\" failed logins in 10 min\"] | append [search index=web_lab sourcetype=web:access status_code=404 | bin _time span=5m | stats count AS n dc(resource) AS evidence BY _time client_ip | where evidence>=10 | eval detection=\"D007 Content discovery\", detail=evidence.\" distinct missing paths, \".n.\" 404s in 5 min\"] | append [search index=web_lab sourcetype=web:access (resource=\"/admin\" OR resource=\"/api/*\") | bin _time span=30m | stats count(eval(status_code=403)) AS d count(eval(status_code>=200 AND status_code<300 AND (method=\"DELETE\" OR method=\"PUT\"))) AS evidence BY _time client_ip | where d>=5 AND evidence>=1 | eval detection=\"D008 Admin denied then modified\", detail=d.\" x 403 then \".evidence.\" successful DELETE/PUT\"] | eval Time=strftime(_time,\"%F %T\") | table Time detection client_ip detail | rename detection AS Detection, client_ip AS \"Client IP\", detail AS Evidence",
+        "query": "| makeresults | eval detection=\"none\" | where 1=0 | append [search index=web_lab sourcetype=web:access resource=\"/login\" status_code=401 | bin _time span=10m | stats count AS evidence BY _time client_ip | where evidence>=20 | eval detection=\"Login brute force\", detail=evidence.\" failed logins in 10 min\"] | append [search index=web_lab sourcetype=web:access status_code=404 | bin _time span=5m | stats count AS n dc(resource) AS evidence BY _time client_ip | where evidence>=10 | eval detection=\"Content discovery\", detail=evidence.\" distinct missing paths, \".n.\" 404s in 5 min\"] | append [search index=web_lab sourcetype=web:access (resource=\"/admin\" OR resource=\"/api/*\") | bin _time span=30m | stats count(eval(status_code=403)) AS d count(eval(status_code>=200 AND status_code<300 AND (method=\"DELETE\" OR method=\"PUT\"))) AS evidence BY _time client_ip | where d>=5 AND evidence>=1 | eval detection=\"Admin denied, then modified\", detail=d.\" x 403 then \".evidence.\" successful DELETE/PUT\"] | eval Time=strftime(_time,\"%F %T\") | table Time detection client_ip detail | rename detection AS Detection, client_ip AS \"Client IP\", detail AS Evidence",
         "queryParameters": {
           "earliest": "$global_time.earliest$",
           "latest": "$global_time.latest$"
@@ -138,7 +138,7 @@
       "dataSources": {
         "primary": "ds_kpi_det"
       },
-      "title": "Detections fired (D005, D007, D008)",
+      "title": "Detections fired",
       "options": {
         "majorColor": "#d41f1f"
       }
@@ -195,7 +195,7 @@
       "dataSources": {
         "primary": "ds_scripted_changes"
       },
-      "title": "Posture: scripted clients changing admin/user endpoints (H002)",
+      "title": "Scripted clients changing admin/user endpoints",
       "options": {
         "count": 10
       }

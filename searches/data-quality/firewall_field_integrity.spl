@@ -1,6 +1,6 @@
-`comment("DQ001 - Firewall log field integrity (data quality, not a threat)
-Flags physically impossible records: ICMP with a port number, and private source IPs carrying a GeoIP country.
-Result on the original dataset: 56 ICMP+port records; every 192.168.x source tagged with 5-6 countries.")`
+``` Firewall log field integrity (data quality, not a threat)
+    Flags physically impossible records: ICMP with a port number, and private source IPs carrying a GeoIP country.
+    Result on the original dataset: 56 ICMP+port records; every 192.168.x source tagged with 5-6 countries. ```
 index=fw_lab sourcetype=fw:traffic
 | eval issue=case(protocol="ICMP" AND isnotnull(port), "ICMP record has a port", cidrmatch("192.168.0.0/16", src_ip) AND isnotnull(country), "private source IP has a country", true(), null())
 | where isnotnull(issue)

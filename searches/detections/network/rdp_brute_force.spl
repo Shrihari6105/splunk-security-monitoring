@@ -1,6 +1,7 @@
-`comment("D010 - RDP brute force | MITRE ATT&CK T1110 / T1021.001
->=15 connections to TCP 3389 from one source within 5 min. Baseline: max 3 per source per 5 min.
-Severity raised when any attempt was allowed through.")`
+``` RDP brute force
+    MITRE ATT&CK T1110 / T1021.001
+    >=15 connections to TCP 3389 from one source within 5 min. Baseline: max 3 per source per 5 min.
+    Severity raised when any attempt was allowed through. ```
 index=fw_lab sourcetype=fw:traffic port=3389
 | bin _time span=5m
 | stats count AS attempts count(eval(action="allowed")) AS allowed values(dest_ip) AS targets values(country) AS country BY _time src_ip

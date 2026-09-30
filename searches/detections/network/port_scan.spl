@@ -1,5 +1,6 @@
-`comment("D009 - Port scan | MITRE ATT&CK T1046 | index=fw_lab sourcetype=fw:traffic
-One source touches >=15 distinct ports on one destination within 5 min. Baseline: max 2 distinct ports per pair per 5 min.")`
+``` Port scan
+    MITRE ATT&CK T1046
+    One source touches >=15 distinct ports on one destination within 5 min. Baseline: max 2 distinct ports per pair per 5 min. ```
 index=fw_lab sourcetype=fw:traffic
 | bin _time span=5m
 | stats dc(port) AS distinct_ports count(eval(action="blocked")) AS blocked count(eval(action="allowed")) AS allowed

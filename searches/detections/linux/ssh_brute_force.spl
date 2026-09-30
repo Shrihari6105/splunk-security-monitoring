@@ -1,6 +1,8 @@
-`comment("D002 - SSH brute force | MITRE ATT&CK T1110.001 | Data: Linux secure log (sourcetype secure-2)
-Fires when one source IP has >=10 failed SSH logins in a 5-minute window.
-Validated 2026-09-30 on project_1: 15+ sources, top 87.194.216.51 (948 failures, 98 usernames).")`
+``` SSH brute force
+    MITRE ATT&CK T1110.001
+    Data: Linux secure log (sourcetype secure-2)
+    Fires when one source IP has >=10 failed SSH logins in a 5-minute window.
+    Validated 2026-09-30 on project_1: top source 87.194.216.51 (948 failures, 98 usernames). ```
 index=project_1 sourcetype=secure-2 "password for"
 | rex "\d\d:\d\d:\d\d (?<dest>\S+) sshd\[\d+\]: (?<action>Failed|Accepted) password for (?<invalid>invalid user )?(?<user>\S+) from (?<src_ip>[\d\.]+) port"
 | where action="Failed"
