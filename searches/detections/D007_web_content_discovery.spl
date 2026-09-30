@@ -1,0 +1,7 @@
+`comment("D007 - Content discovery / forced browsing | MITRE ATT&CK T1595.003 / T1083
+One client requests >=10 distinct non-existent paths (404) within 5 min. Baseline: max 2 distinct 404 paths per client per 5 min.")`
+index=web_lab sourcetype=web:access status_code=404
+| bin _time span=5m
+| stats count AS errors_404 dc(resource) AS distinct_paths values(resource) AS sample_paths values(user_agent) AS ua BY _time client_ip
+| where distinct_paths >= 10
+| eval sample_paths=mvindex(sample_paths, 0, 9)

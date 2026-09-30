@@ -1,0 +1,10 @@
+`comment("D008 - Denied admin access followed by successful destructive requests | MITRE ATT&CK T1078 / T1485
+>=5 x 403 on /admin or /api/* then >=1 successful DELETE/PUT from the same client within 30 min.
+Baseline: max 2 x 403 per client per 15 min.")`
+index=web_lab sourcetype=web:access (resource="/admin" OR resource="/api/*")
+| bin _time span=30m
+| stats count(eval(status_code=403)) AS denied
+        count(eval(status_code>=200 AND status_code<300 AND (method="DELETE" OR method="PUT"))) AS destructive_ok
+        values(eval(if(status_code>=200 AND status_code<300 AND (method="DELETE" OR method="PUT"), method." ".resource, null()))) AS actions
+        values(user_agent) AS ua BY _time client_ip
+| where denied >= 5 AND destructive_ok >= 1

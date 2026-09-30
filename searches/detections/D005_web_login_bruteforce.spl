@@ -1,0 +1,8 @@
+`comment("D005 - Web login brute force | MITRE ATT&CK T1110.001 | index=web_lab sourcetype=web:access
+>=20 failed logins (HTTP 401 on /login) from one client in 10 min. Baseline: 0 x 401 in the original data.")`
+index=web_lab sourcetype=web:access resource="/login" status_code=401
+| bin _time span=10m
+| stats count AS failed_logins dc(user_agent) AS user_agents values(user_agent) AS ua BY _time client_ip
+| where failed_logins >= 20
+| join type=left client_ip [ search index=web_lab sourcetype=web:access resource="/login" status_code=200 | stats latest(_time) AS last_success BY client_ip ]
+| eval success_after_failures=if(last_success >= _time, "YES", "no"), last_success=strftime(last_success, "%F %T")

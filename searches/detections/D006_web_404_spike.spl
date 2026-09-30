@@ -1,0 +1,8 @@
+`comment("D006 - HTTP 404 spike (improved version of the IBM assessment alert) | MITRE ATT&CK T1595.003
+Global 404s per 5 min above 20. Baseline: max 4, p99 3 per 5 min, so 20 is 5x the busiest normal window.
+Adds the top offending client so the alert is actionable.")`
+index=web_lab sourcetype=web:access status_code=404
+| bin _time span=5m
+| stats count AS errors_404 dc(client_ip) AS clients BY _time
+| where errors_404 > 20
+| join type=left _time [ search index=web_lab sourcetype=web:access status_code=404 | bin _time span=5m | stats count AS c BY _time client_ip | sort 0 - c | dedup _time | rename client_ip AS top_client, c AS top_client_404s ]

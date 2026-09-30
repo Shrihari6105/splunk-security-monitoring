@@ -1,0 +1,387 @@
+{
+  "title": "SSH & Web Security Overview",
+  "description": "SOC view of SSH authentication and web traffic in index project_1 (Buttercup Games tutorial data).",
+  "dataSources": {
+    "ds_kpi_failed": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=project_1 sourcetype=secure-2 \"password for\" | rex \"\\d\\d:\\d\\d:\\d\\d (?<dest>\\S+) sshd\\[\\d+\\]: (?<action>Failed|Accepted) password for (?<invalid>invalid user )?(?<user>\\S+) from (?<src_ip>[\\d\\.]+) port\" | where action=\"Failed\" | stats count as \"Failed SSH logins\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_kpi_accepted": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=project_1 sourcetype=secure-2 \"password for\" | rex \"\\d\\d:\\d\\d:\\d\\d (?<dest>\\S+) sshd\\[\\d+\\]: (?<action>Failed|Accepted) password for (?<invalid>invalid user )?(?<user>\\S+) from (?<src_ip>[\\d\\.]+) port\" | where action=\"Accepted\" | stats count as \"Successful SSH logins\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_kpi_attackers": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=project_1 sourcetype=secure-2 \"password for\" | rex \"\\d\\d:\\d\\d:\\d\\d (?<dest>\\S+) sshd\\[\\d+\\]: (?<action>Failed|Accepted) password for (?<invalid>invalid user )?(?<user>\\S+) from (?<src_ip>[\\d\\.]+) port\" | where action=\"Failed\" | stats dc(src_ip) as \"Attacking IPs\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_kpi_invalid": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=project_1 sourcetype=secure-2 \"password for\" | rex \"\\d\\d:\\d\\d:\\d\\d (?<dest>\\S+) sshd\\[\\d+\\]: (?<action>Failed|Accepted) password for (?<invalid>invalid user )?(?<user>\\S+) from (?<src_ip>[\\d\\.]+) port\" | where isnotnull(invalid) | stats count as \"Invalid-user attempts\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_auth_trend": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=project_1 sourcetype=secure-2 \"password for\" | rex \"\\d\\d:\\d\\d:\\d\\d (?<dest>\\S+) sshd\\[\\d+\\]: (?<action>Failed|Accepted) password for (?<invalid>invalid user )?(?<user>\\S+) from (?<src_ip>[\\d\\.]+) port\" | where isnotnull(action) | timechart count by action",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_by_host": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=project_1 sourcetype=secure-2 \"password for\" | rex \"\\d\\d:\\d\\d:\\d\\d (?<dest>\\S+) sshd\\[\\d+\\]: (?<action>Failed|Accepted) password for (?<invalid>invalid user )?(?<user>\\S+) from (?<src_ip>[\\d\\.]+) port\" | where action=\"Failed\" | stats count as \"Failed logins\" by dest | rename dest as Host | sort -\"Failed logins\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_brute": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=project_1 sourcetype=secure-2 \"password for\" | rex \"\\d\\d:\\d\\d:\\d\\d (?<dest>\\S+) sshd\\[\\d+\\]: (?<action>Failed|Accepted) password for (?<invalid>invalid user )?(?<user>\\S+) from (?<src_ip>[\\d\\.]+) port\" | where action=\"Failed\" | bin _time span=5m | stats count as failed dc(user) as users by _time src_ip | where failed>=10 | stats count as \"5-min bursts\" sum(failed) as \"Failed logins\" max(users) as \"Max usernames tried\" latest(_time) as last_seen by src_ip | eval \"Last seen\"=strftime(last_seen,\"%F %T\") | fields - last_seen | rename src_ip as \"Source IP\" | sort -\"Failed logins\" | head 15",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_countries": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=project_1 sourcetype=secure-2 \"password for\" | rex \"\\d\\d:\\d\\d:\\d\\d (?<dest>\\S+) sshd\\[\\d+\\]: (?<action>Failed|Accepted) password for (?<invalid>invalid user )?(?<user>\\S+) from (?<src_ip>[\\d\\.]+) port\" | where action=\"Failed\" | iplocation src_ip | stats count as \"Failed logins\" by Country | sort -\"Failed logins\" | head 10",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_usernames": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=project_1 sourcetype=secure-2 \"password for\" | rex \"\\d\\d:\\d\\d:\\d\\d (?<dest>\\S+) sshd\\[\\d+\\]: (?<action>Failed|Accepted) password for (?<invalid>invalid user )?(?<user>\\S+) from (?<src_ip>[\\d\\.]+) port\" | where isnotnull(invalid) | stats count as Attempts by user | sort -Attempts | head 10 | rename user as Username",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_web_status": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=project_1 sourcetype=access_combined_wcookie status>=400 | stats count as Requests by status | sort status | eval status=tostring(status)",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_web_scan": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=project_1 sourcetype=access_combined_wcookie status>=400 | stats count as Errors dc(uri_path) as \"Distinct URIs\" dc(status) as \"Status codes\" values(method) as Methods by clientip | where Errors>=20 | sort -Errors | rename clientip as \"Client IP\" | head 15",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_compromise": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=project_1 sourcetype=secure-2 \"password for\" | rex \"\\d\\d:\\d\\d:\\d\\d (?<dest>\\S+) sshd\\[\\d+\\]: (?<action>Failed|Accepted) password for (?<invalid>invalid user )?(?<user>\\S+) from (?<src_ip>[\\d\\.]+) port\" | stats count(eval(action=\"Failed\")) as failed count(eval(action=\"Accepted\")) as accepted values(eval(if(action=\"Accepted\",user,null()))) as users by src_ip | where failed>=5 AND accepted>0 | rename src_ip as \"Source IP\", failed as \"Failed\", accepted as \"Accepted\", users as \"Accounts accessed\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    }
+  },
+  "visualizations": {
+    "viz_kpi_failed": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_kpi_failed"
+      },
+      "title": "Failed SSH logins",
+      "options": {
+        "majorColor": "#d41f1f"
+      }
+    },
+    "viz_kpi_accepted": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_kpi_accepted"
+      },
+      "title": "Successful SSH logins",
+      "options": {
+        "majorColor": "#118832"
+      }
+    },
+    "viz_kpi_attackers": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_kpi_attackers"
+      },
+      "title": "Unique attacking IPs",
+      "options": {
+        "majorColor": "#f58f39"
+      }
+    },
+    "viz_kpi_invalid": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_kpi_invalid"
+      },
+      "title": "Invalid-user attempts",
+      "options": {
+        "majorColor": "#d41f1f"
+      }
+    },
+    "viz_auth_trend": {
+      "type": "splunk.line",
+      "dataSources": {
+        "primary": "ds_auth_trend"
+      },
+      "title": "SSH authentication over time"
+    },
+    "viz_by_host": {
+      "type": "splunk.column",
+      "dataSources": {
+        "primary": "ds_by_host"
+      },
+      "title": "Failed SSH logins by target host"
+    },
+    "viz_brute": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_brute"
+      },
+      "title": "Brute-force sources (≥10 failures in 5 min) — T1110",
+      "options": {
+        "count": 15
+      }
+    },
+    "viz_countries": {
+      "type": "splunk.bar",
+      "dataSources": {
+        "primary": "ds_countries"
+      },
+      "title": "Failed logins by source country"
+    },
+    "viz_usernames": {
+      "type": "splunk.bar",
+      "dataSources": {
+        "primary": "ds_usernames"
+      },
+      "title": "Most-targeted invalid usernames"
+    },
+    "viz_web_status": {
+      "type": "splunk.column",
+      "dataSources": {
+        "primary": "ds_web_status"
+      },
+      "title": "Web error responses by status"
+    },
+    "viz_web_scan": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_web_scan"
+      },
+      "title": "Suspicious web clients (≥20 error responses) — possible scanning",
+      "options": {
+        "count": 15
+      }
+    },
+    "viz_compromise": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_compromise"
+      },
+      "title": "Possible compromise: success after ≥5 failures from same IP",
+      "options": {
+        "count": 15
+      },
+      "description": "Empty table = no successful login from a brute-forcing IP"
+    }
+  },
+  "inputs": {
+    "input_global_time": {
+      "type": "input.timerange",
+      "options": {
+        "token": "global_time",
+        "defaultValue": "0,"
+      },
+      "title": "Time Range"
+    }
+  },
+  "layout": {
+    "type": "grid",
+    "options": {
+      "width": 1440
+    },
+    "globalInputs": [
+      "input_global_time"
+    ],
+    "structure": [
+      {
+        "item": "viz_kpi_failed",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 0,
+          "w": 360,
+          "h": 150
+        }
+      },
+      {
+        "item": "viz_kpi_accepted",
+        "type": "block",
+        "position": {
+          "x": 360,
+          "y": 0,
+          "w": 360,
+          "h": 150
+        }
+      },
+      {
+        "item": "viz_kpi_attackers",
+        "type": "block",
+        "position": {
+          "x": 720,
+          "y": 0,
+          "w": 360,
+          "h": 150
+        }
+      },
+      {
+        "item": "viz_kpi_invalid",
+        "type": "block",
+        "position": {
+          "x": 1080,
+          "y": 0,
+          "w": 360,
+          "h": 150
+        }
+      },
+      {
+        "item": "viz_auth_trend",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 150,
+          "w": 960,
+          "h": 320
+        }
+      },
+      {
+        "item": "viz_by_host",
+        "type": "block",
+        "position": {
+          "x": 960,
+          "y": 150,
+          "w": 480,
+          "h": 320
+        }
+      },
+      {
+        "item": "viz_brute",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 470,
+          "w": 960,
+          "h": 400
+        }
+      },
+      {
+        "item": "viz_countries",
+        "type": "block",
+        "position": {
+          "x": 960,
+          "y": 470,
+          "w": 480,
+          "h": 400
+        }
+      },
+      {
+        "item": "viz_usernames",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 870,
+          "w": 720,
+          "h": 320
+        }
+      },
+      {
+        "item": "viz_web_status",
+        "type": "block",
+        "position": {
+          "x": 720,
+          "y": 870,
+          "w": 720,
+          "h": 320
+        }
+      },
+      {
+        "item": "viz_web_scan",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 1190,
+          "w": 720,
+          "h": 400
+        }
+      },
+      {
+        "item": "viz_compromise",
+        "type": "block",
+        "position": {
+          "x": 720,
+          "y": 1190,
+          "w": 720,
+          "h": 400
+        }
+      }
+    ]
+  },
+  "defaults": {
+    "dataSources": {
+      "ds.search": {
+        "options": {
+          "queryParameters": {
+            "earliest": "0",
+            "latest": ""
+          }
+        }
+      }
+    }
+  }
+}

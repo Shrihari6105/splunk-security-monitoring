@@ -1,0 +1,337 @@
+{
+  "title": "Web App Threat Monitor v2",
+  "description": "Improved version of the IBM assessment dashboard: complex_log.csv baseline + labelled attack simulation (index web_lab).",
+  "dataSources": {
+    "ds_kpi_req": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=web_lab sourcetype=web:access | stats count AS Requests",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_kpi_err": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=web_lab sourcetype=web:access | stats count(eval(status_code>=400)) AS e count AS n | eval \"Error rate %\"=round(100*e/n,1) | fields \"Error rate %\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_kpi_401": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=web_lab sourcetype=web:access status_code=401 | stats count AS \"Failed logins\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_kpi_det": {
+      "type": "ds.search",
+      "options": {
+        "query": "| makeresults | where 1=0 | append [search index=web_lab sourcetype=web:access resource=\"/login\" status_code=401 | bin _time span=10m | stats count BY _time client_ip | where count>=20] | append [search index=web_lab sourcetype=web:access status_code=404 | bin _time span=5m | stats dc(resource) AS d BY _time client_ip | where d>=10] | append [search index=web_lab sourcetype=web:access (resource=\"/admin\" OR resource=\"/api/*\") | bin _time span=30m | stats count(eval(status_code=403)) AS d count(eval(status_code>=200 AND status_code<300 AND (method=\"DELETE\" OR method=\"PUT\"))) AS o BY _time client_ip | where d>=5 AND o>=1] | stats count AS \"Detections fired\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_trend": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=web_lab sourcetype=web:access | eval class=substr(tostring(status_code),1,1).\"xx\" | bin _time span=15m | stats count BY _time class | xyseries _time class count | fillnull value=0",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_detections": {
+      "type": "ds.search",
+      "options": {
+        "query": "| makeresults | eval detection=\"none\" | where 1=0 | append [search index=web_lab sourcetype=web:access resource=\"/login\" status_code=401 | bin _time span=10m | stats count AS evidence BY _time client_ip | where evidence>=20 | eval detection=\"D005 Login brute force\", detail=evidence.\" failed logins in 10 min\"] | append [search index=web_lab sourcetype=web:access status_code=404 | bin _time span=5m | stats count AS n dc(resource) AS evidence BY _time client_ip | where evidence>=10 | eval detection=\"D007 Content discovery\", detail=evidence.\" distinct missing paths, \".n.\" 404s in 5 min\"] | append [search index=web_lab sourcetype=web:access (resource=\"/admin\" OR resource=\"/api/*\") | bin _time span=30m | stats count(eval(status_code=403)) AS d count(eval(status_code>=200 AND status_code<300 AND (method=\"DELETE\" OR method=\"PUT\"))) AS evidence BY _time client_ip | where d>=5 AND evidence>=1 | eval detection=\"D008 Admin denied then modified\", detail=d.\" x 403 then \".evidence.\" successful DELETE/PUT\"] | eval Time=strftime(_time,\"%F %T\") | table Time detection client_ip detail | rename detection AS Detection, client_ip AS \"Client IP\", detail AS Evidence",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_top404": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=web_lab sourcetype=web:access status_code=404 | stats count AS \"404s\" dc(resource) AS \"Distinct paths\" BY client_ip | sort - \"404s\" | head 8 | rename client_ip AS \"Client IP\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_ua": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=web_lab sourcetype=web:access | eval client_type=case(match(user_agent,\"(?i)curl|postman|python|nikto|sqlmap\"),\"Scripted / tool\",true(),\"Browser\") | stats count BY client_type status_code | xyseries status_code client_type count | fillnull value=0 | rename status_code AS Status",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_admin": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=web_lab sourcetype=web:access resource=\"/admin\" | stats count BY method status_code | xyseries method status_code count | fillnull value=0 | rename method AS Method",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_scripted_changes": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=web_lab sourcetype=web:access (user_agent=\"curl*\" OR user_agent=\"Postman*\" OR user_agent=\"python*\") (method=DELETE OR method=PUT) resource IN (\"/admin\",\"/api/user\") status_code>=200 status_code<300 | stats count AS Requests values(method) AS Methods values(resource) AS Endpoints BY client_ip | sort - Requests | rename client_ip AS \"Client IP\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    }
+  },
+  "visualizations": {
+    "viz_kpi_req": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_kpi_req"
+      },
+      "title": "Requests"
+    },
+    "viz_kpi_err": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_kpi_err"
+      },
+      "title": "Error rate (4xx+5xx)",
+      "options": {
+        "majorColor": "#f58f39",
+        "unit": "%",
+        "numberPrecision": 1
+      }
+    },
+    "viz_kpi_401": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_kpi_401"
+      },
+      "title": "Failed logins (401)",
+      "options": {
+        "majorColor": "#d41f1f"
+      }
+    },
+    "viz_kpi_det": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_kpi_det"
+      },
+      "title": "Detections fired (D005, D007, D008)",
+      "options": {
+        "majorColor": "#d41f1f"
+      }
+    },
+    "viz_trend": {
+      "type": "splunk.column",
+      "dataSources": {
+        "primary": "ds_trend"
+      },
+      "title": "Requests by status class (15 min)",
+      "options": {
+        "stackMode": "stacked"
+      }
+    },
+    "viz_detections": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_detections"
+      },
+      "title": "Web detections fired",
+      "options": {
+        "count": 10
+      }
+    },
+    "viz_top404": {
+      "type": "splunk.bar",
+      "dataSources": {
+        "primary": "ds_top404"
+      },
+      "title": "Top clients by 404s"
+    },
+    "viz_ua": {
+      "type": "splunk.column",
+      "dataSources": {
+        "primary": "ds_ua"
+      },
+      "title": "Browser vs scripted clients by status",
+      "options": {
+        "stackMode": "stacked"
+      }
+    },
+    "viz_admin": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_admin"
+      },
+      "title": "/admin requests by method and status",
+      "options": {
+        "count": 10
+      }
+    },
+    "viz_scripted_changes": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_scripted_changes"
+      },
+      "title": "Posture: scripted clients changing admin/user endpoints (H002)",
+      "options": {
+        "count": 10
+      }
+    }
+  },
+  "inputs": {
+    "input_global_time": {
+      "type": "input.timerange",
+      "options": {
+        "token": "global_time",
+        "defaultValue": "0,"
+      },
+      "title": "Time Range"
+    }
+  },
+  "layout": {
+    "type": "grid",
+    "options": {
+      "width": 1440
+    },
+    "globalInputs": [
+      "input_global_time"
+    ],
+    "structure": [
+      {
+        "item": "viz_kpi_req",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 0,
+          "w": 360,
+          "h": 140
+        }
+      },
+      {
+        "item": "viz_kpi_err",
+        "type": "block",
+        "position": {
+          "x": 360,
+          "y": 0,
+          "w": 360,
+          "h": 140
+        }
+      },
+      {
+        "item": "viz_kpi_401",
+        "type": "block",
+        "position": {
+          "x": 720,
+          "y": 0,
+          "w": 360,
+          "h": 140
+        }
+      },
+      {
+        "item": "viz_kpi_det",
+        "type": "block",
+        "position": {
+          "x": 1080,
+          "y": 0,
+          "w": 360,
+          "h": 140
+        }
+      },
+      {
+        "item": "viz_trend",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 140,
+          "w": 1440,
+          "h": 300
+        }
+      },
+      {
+        "item": "viz_detections",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 440,
+          "w": 1440,
+          "h": 220
+        }
+      },
+      {
+        "item": "viz_top404",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 660,
+          "w": 720,
+          "h": 320
+        }
+      },
+      {
+        "item": "viz_ua",
+        "type": "block",
+        "position": {
+          "x": 720,
+          "y": 660,
+          "w": 720,
+          "h": 320
+        }
+      },
+      {
+        "item": "viz_admin",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 980,
+          "w": 560,
+          "h": 300
+        }
+      },
+      {
+        "item": "viz_scripted_changes",
+        "type": "block",
+        "position": {
+          "x": 560,
+          "y": 980,
+          "w": 880,
+          "h": 300
+        }
+      }
+    ]
+  },
+  "defaults": {
+    "dataSources": {
+      "ds.search": {
+        "options": {
+          "queryParameters": {
+            "earliest": "0",
+            "latest": ""
+          }
+        }
+      }
+    }
+  }
+}

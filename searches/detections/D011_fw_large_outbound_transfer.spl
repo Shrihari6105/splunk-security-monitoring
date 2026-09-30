@@ -1,0 +1,8 @@
+`comment("D011 - Large outbound transfer to an external IP (possible exfiltration) | MITRE ATT&CK T1041 / T1048
+>=50 MB from one internal host to one external (non-RFC1918) IP within 10 min. Baseline: max 18.7 KB per host pair per 10 min.")`
+index=fw_lab sourcetype=fw:traffic action=allowed
+| where NOT (cidrmatch("10.0.0.0/8", dest_ip) OR cidrmatch("172.16.0.0/12", dest_ip) OR cidrmatch("192.168.0.0/16", dest_ip))
+| bin _time span=10m
+| stats sum(bytes) AS bytes_out count AS connections values(port) AS ports BY _time src_ip dest_ip
+| where bytes_out >= 50000000
+| eval MB_out=round(bytes_out/1024/1024, 1)

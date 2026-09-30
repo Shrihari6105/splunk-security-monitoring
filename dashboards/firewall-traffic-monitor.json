@@ -1,0 +1,307 @@
+{
+  "title": "Firewall Traffic Monitor",
+  "description": "firewall_traffic_logs_large.csv baseline + labelled attack simulation (index fw_lab).",
+  "dataSources": {
+    "ds_kpi_conn": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=fw_lab sourcetype=fw:traffic | stats count AS Connections",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_kpi_block": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=fw_lab sourcetype=fw:traffic | stats count(eval(action=\"blocked\")) AS b count AS n | eval \"Blocked %\"=round(100*b/n,1) | fields \"Blocked %\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_kpi_ext": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=fw_lab sourcetype=fw:traffic action=allowed | where NOT (cidrmatch(\"10.0.0.0/8\",dest_ip) OR cidrmatch(\"172.16.0.0/12\",dest_ip) OR cidrmatch(\"192.168.0.0/16\",dest_ip)) | stats sum(bytes) AS b | eval \"MB to external IPs\"=round(b/1024/1024,1) | fields \"MB to external IPs\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_kpi_srcs": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=fw_lab sourcetype=fw:traffic | stats dc(src_ip) AS \"Source IPs\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_trend": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=fw_lab sourcetype=fw:traffic | bin _time span=5m | stats count BY _time action | xyseries _time action count | fillnull value=0",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_detections": {
+      "type": "ds.search",
+      "options": {
+        "query": "| makeresults | where 1=0 | append [search index=fw_lab sourcetype=fw:traffic | bin _time span=5m | stats dc(port) AS evidence BY _time src_ip dest_ip | where evidence>=15 | eval detection=\"D009 Port scan\", detail=evidence.\" distinct ports on \".dest_ip] | append [search index=fw_lab sourcetype=fw:traffic port=3389 | bin _time span=5m | stats count AS evidence count(eval(action=\"allowed\")) AS a BY _time src_ip | where evidence>=15 | eval detection=\"D010 RDP brute force\", detail=evidence.\" attempts, \".a.\" allowed\"] | append [search index=fw_lab sourcetype=fw:traffic action=allowed | where NOT (cidrmatch(\"10.0.0.0/8\",dest_ip) OR cidrmatch(\"172.16.0.0/12\",dest_ip) OR cidrmatch(\"192.168.0.0/16\",dest_ip)) | bin _time span=10m | stats sum(bytes) AS b BY _time src_ip dest_ip | where b>=50000000 | eval detection=\"D011 Large outbound transfer\", detail=round(b/1024/1024,1).\" MB to \".dest_ip] | eval Time=strftime(_time,\"%F %T\") | table Time detection src_ip detail | rename detection AS Detection, src_ip AS \"Source IP\", detail AS Evidence",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_ports": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=fw_lab sourcetype=fw:traffic | stats count(eval(action=\"allowed\")) AS Allowed count(eval(action=\"blocked\")) AS Blocked BY port | eval total=Allowed+Blocked | sort - total | head 10 | fields - total | eval port=tostring(port) | rename port AS Port",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_rdp": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=fw_lab sourcetype=fw:traffic port=3389 | stats count AS Attempts count(eval(action=\"allowed\")) AS Allowed BY src_ip | sort - Attempts | head 10 | rename src_ip AS \"Source IP\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_dq": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=fw_lab sourcetype=fw:traffic | eval issue=case(protocol=\"ICMP\" AND isnotnull(port),\"ICMP record has a port\",cidrmatch(\"192.168.0.0/16\",src_ip) AND isnotnull(country),\"Private source IP has a country\",true(),null()) | where isnotnull(issue) | stats count AS Records dc(src_ip) AS Sources BY issue | rename issue AS Issue",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    }
+  },
+  "visualizations": {
+    "viz_kpi_conn": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_kpi_conn"
+      },
+      "title": "Connections"
+    },
+    "viz_kpi_block": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_kpi_block"
+      },
+      "title": "Blocked",
+      "options": {
+        "majorColor": "#f58f39",
+        "unit": "%",
+        "numberPrecision": 1
+      }
+    },
+    "viz_kpi_ext": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_kpi_ext"
+      },
+      "title": "Outbound to external IPs (MB)",
+      "options": {
+        "majorColor": "#d41f1f"
+      }
+    },
+    "viz_kpi_srcs": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_kpi_srcs"
+      },
+      "title": "Distinct source IPs"
+    },
+    "viz_trend": {
+      "type": "splunk.column",
+      "dataSources": {
+        "primary": "ds_trend"
+      },
+      "title": "Connections by action (5 min)",
+      "options": {
+        "stackMode": "stacked"
+      }
+    },
+    "viz_detections": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_detections"
+      },
+      "title": "Firewall detections fired",
+      "options": {
+        "count": 10
+      }
+    },
+    "viz_ports": {
+      "type": "splunk.bar",
+      "dataSources": {
+        "primary": "ds_ports"
+      },
+      "title": "Top destination ports",
+      "options": {
+        "stackMode": "stacked"
+      }
+    },
+    "viz_rdp": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_rdp"
+      },
+      "title": "RDP (3389) attempts by source",
+      "options": {
+        "count": 10
+      }
+    },
+    "viz_dq": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_dq"
+      },
+      "title": "Data quality: impossible field combinations (DQ001)",
+      "options": {
+        "count": 10
+      }
+    }
+  },
+  "inputs": {
+    "input_global_time": {
+      "type": "input.timerange",
+      "options": {
+        "token": "global_time",
+        "defaultValue": "0,"
+      },
+      "title": "Time Range"
+    }
+  },
+  "layout": {
+    "type": "grid",
+    "options": {
+      "width": 1440
+    },
+    "globalInputs": [
+      "input_global_time"
+    ],
+    "structure": [
+      {
+        "item": "viz_kpi_conn",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 0,
+          "w": 360,
+          "h": 140
+        }
+      },
+      {
+        "item": "viz_kpi_block",
+        "type": "block",
+        "position": {
+          "x": 360,
+          "y": 0,
+          "w": 360,
+          "h": 140
+        }
+      },
+      {
+        "item": "viz_kpi_ext",
+        "type": "block",
+        "position": {
+          "x": 720,
+          "y": 0,
+          "w": 360,
+          "h": 140
+        }
+      },
+      {
+        "item": "viz_kpi_srcs",
+        "type": "block",
+        "position": {
+          "x": 1080,
+          "y": 0,
+          "w": 360,
+          "h": 140
+        }
+      },
+      {
+        "item": "viz_trend",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 140,
+          "w": 1440,
+          "h": 280
+        }
+      },
+      {
+        "item": "viz_detections",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 420,
+          "w": 1440,
+          "h": 200
+        }
+      },
+      {
+        "item": "viz_ports",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 620,
+          "w": 720,
+          "h": 320
+        }
+      },
+      {
+        "item": "viz_rdp",
+        "type": "block",
+        "position": {
+          "x": 720,
+          "y": 620,
+          "w": 720,
+          "h": 320
+        }
+      },
+      {
+        "item": "viz_dq",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 940,
+          "w": 1440,
+          "h": 200
+        }
+      }
+    ]
+  },
+  "defaults": {
+    "dataSources": {
+      "ds.search": {
+        "options": {
+          "queryParameters": {
+            "earliest": "0",
+            "latest": ""
+          }
+        }
+      }
+    }
+  }
+}

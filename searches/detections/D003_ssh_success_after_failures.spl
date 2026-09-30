@@ -1,0 +1,10 @@
+`comment("D003 - Successful SSH login after repeated failures (possible compromise) | MITRE ATT&CK T1110 / T1078
+Fires when a source IP with >=5 failed logins also has a successful login.
+Validated 2026-09-30 on project_1: 0 results - no brute-forcing IP ever logged in.")`
+index=project_1 sourcetype=secure-2 "password for"
+| rex "\d\d:\d\d:\d\d (?<dest>\S+) sshd\[\d+\]: (?<action>Failed|Accepted) password for (?<invalid>invalid user )?(?<user>\S+) from (?<src_ip>[\d\.]+) port"
+| stats count(eval(action="Failed")) AS failed count(eval(action="Accepted")) AS accepted
+        values(eval(if(action="Accepted", user, null()))) AS accounts_accessed
+        min(_time) AS first_seen max(_time) AS last_seen BY src_ip
+| where failed >= 5 AND accepted > 0
+| convert ctime(first_seen) ctime(last_seen)

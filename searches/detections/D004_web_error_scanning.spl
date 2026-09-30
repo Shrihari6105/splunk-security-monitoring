@@ -1,0 +1,7 @@
+`comment("D004 - Web scanning / probing | MITRE ATT&CK T1595 | Data: Apache access log (access_combined_wcookie)
+Fires when a client IP generates >=20 HTTP 4xx/5xx responses.
+Validated 2026-09-30 on project_1: top 87.194.216.51 (142 errors across 12 URIs).")`
+index=project_1 sourcetype=access_combined_wcookie status>=400
+| stats count AS errors dc(uri_path) AS distinct_uris dc(status) AS status_codes values(method) AS methods BY clientip
+| where errors >= 20
+| sort - errors
